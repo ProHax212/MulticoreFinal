@@ -12,10 +12,11 @@ public class SequentialPriorityQueue {
     // Constructor
     public SequentialPriorityQueue(){
         heap = new ArrayList<>();
+        heap.add(new Node(42, 1));   // Sentinel Node
     }
 
     // Insert an object with the given priority
-    public void insert(Object value, int priority){
+    public void insert(Integer value, int priority){
         // Is the queue empty
         if(heap.size() == 0){
             heap.add(new Node(value, priority));
@@ -41,7 +42,7 @@ public class SequentialPriorityQueue {
     }
 
     // Take the top object off (highest priority)
-    public Object remove(){
+    public Integer remove(){
         // Check if the queue is empty
         if(heap.size() == 0) return null;   // Or throw an exception
 
@@ -54,6 +55,7 @@ public class SequentialPriorityQueue {
         int index = 0;
         int leftChildIndex = getLeftChild(0);
         int rightChildIndex = getRightChild(0);
+        System.out.println("Index: " + index + "\tLeft: " + leftChildIndex + "\tRight: " + rightChildIndex);
         // Loop while at least one of the children has higher priority
         while(heap.get(leftChildIndex).priority > heap.get(index).priority || heap.get(rightChildIndex).priority > heap.get(index).priority){
             // Left child has higher priority
@@ -86,10 +88,10 @@ public class SequentialPriorityQueue {
     private static class Node{
 
         public int priority;
-        public Object value;
+        public Integer value;
 
         // Constructor
-        public Node(Object value, int priority){
+        public Node(Integer value, int priority){
             this.priority = priority;
             this.value = value;
         }
@@ -99,6 +101,15 @@ public class SequentialPriorityQueue {
     // Helper methods for indexing the heap
     private int getParent(int index){return index/2;}
     private int getLeftChild(int index){return 2*index;}
-    private int getRightChild(int index){return 2*index + 1;}
+    private int getRightChild(int index){return 2*index+1;}
+
+    public String toString(){
+        String returnString = "";
+        for(int i = 0; i < heap.size(); i++){
+            returnString += heap.get(i).value + ", ";
+        }
+
+        return returnString;
+    }
 
 }
