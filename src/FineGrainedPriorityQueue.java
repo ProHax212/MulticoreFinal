@@ -62,6 +62,13 @@ public class FineGrainedPriorityQueue {
                 heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();
             }
         }
+
+        // First insert
+        if(index == 1){
+            heap.get(index).lock.lock();
+            if(heap.get(index).tag == Thread.currentThread().getId()) heap.get(index).tag = -1L;  // Available
+            heap.get(index).lock.unlock();
+        }
     }
 
     // Remove a node from the priority queue
@@ -107,7 +114,7 @@ public class FineGrainedPriorityQueue {
     public String toString(){
         String returnString = "";
         for(Node node : heap){
-            returnString += node.value + ", ";
+            returnString += node.priority + ", ";
         }
 
         return returnString;

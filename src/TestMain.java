@@ -9,29 +9,17 @@ public class TestMain {
         FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
         Random r = new Random();
 
-//        for(int i = 0; i < 1; i++){
-//            Thread thread = new Thread(new Runnable() {
-//                @Override
-//                public void run() {
-//                    for(int i = 0; i < 5; i++){
-//                        queue.insert(r.nextInt(10), r.nextInt(10));
-//                        System.out.println(queue);
-//                    }
-//                }
-//            });
-//            thread.start();
-//        }
-
-        Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                for(int i = 0; i < 5; i++){
-                    queue.insert(r.nextInt(10), r.nextInt(10));
-                    System.out.println(queue);
+        for(int i = 0; i < 5; i++){
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for(int i = 0; i < 5; i++){
+                        queue.insert(r.nextInt(10), r.nextInt(10));
+                    }
                 }
-            }
-        });
-        thread.start();
+            });
+            thread.start();
+        }
 
         try{Thread.sleep(500);}
         catch (InterruptedException e){}
