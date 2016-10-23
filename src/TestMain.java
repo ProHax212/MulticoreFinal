@@ -14,17 +14,22 @@ public class TestMain {
                 @Override
                 public void run() {
                     for(int i = 0; i < 5; i++){
-                        queue.insert(r.nextInt(10), r.nextInt(10));
+                        int num = r.nextInt(50);
+                        queue.insert(num, num);
+                    }
+//                    System.out.println(queue);
+                    for(int i = 0; i < 5; i++){
+                        System.out.println(queue.remove());
                     }
                 }
             });
             thread.start();
         }
 
-        try{Thread.sleep(500);}
-        catch (InterruptedException e){}
-
-        System.out.println(queue);
+//        try{Thread.sleep(500);}
+//        catch (InterruptedException e){}
+//
+//        System.out.println(queue);
     }
 
 }
