@@ -19,8 +19,8 @@ public class SequentialSkipList {
         Node n2 = new Node(Integer.MAX_VALUE, null);
 
         // Link the nodes
-        n1.left = n2;
-        n2.right = n1;
+        n1.right = n2;
+        n2.left = n1;
 
         // Initialize head/tail
         head = n1;
@@ -42,7 +42,7 @@ public class SequentialSkipList {
         // Keep going until you either find the node or its not there
         while(true){
             // Move right while the right key is smaller
-            while(n.right.key < key) n = n.right;
+            while(n.right.key <= key) n = n.right;
 
             // Go down if you can
             if(n.down != null) n = n.down;
@@ -88,6 +88,22 @@ public class SequentialSkipList {
             // Reached to top level
             if(i >= this.height){
                 // Create a new empty top layer
+                Node n1 = new Node(Integer.MIN_VALUE, null);
+                Node n2 = new Node(Integer.MAX_VALUE, null);
+
+                // Link the nodes
+                n1.right = n2;
+                n2.left = n1;
+                n1.down = head;
+                n2.down = tail;
+
+                // Update head and tail
+                head.up = n1;
+                tail.up = n2;
+                head = n1;
+                tail = n2;
+
+                this.height += 1;   // One more level
             }
 
             // Find first element with an UP-link
@@ -124,6 +140,24 @@ public class SequentialSkipList {
         public Node(int key, Integer value){
             this.key = key;
             this.value = value;
+        }
+    }
+
+    // toString method for the Skip list
+    public void print(){
+        int level = height;
+        Node p = head, q = head.right;
+        while(level >= 0){
+            System.out.print(level + ":\t" + p.key + "\t");
+            while(q != null){
+                System.out.print(q.key + "\t");
+                q = q.right;
+            }
+            System.out.println();
+            if(p.down == null) break;
+            p = p.down;
+            q = p.right;
+            level -= 1;
         }
     }
 

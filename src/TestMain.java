@@ -9,8 +9,9 @@ public class TestMain {
         // LOCK FREE PRIORITY QUEUE TESTING
         LockFreePriorityQueue queue = new LockFreePriorityQueue();
 
-
-
+        SequentialSkipList skipList = new SequentialSkipList();
+        for(int i = 0; i < 10; i++) skipList.insert(i, 0);
+        skipList.print();
 
 
 
