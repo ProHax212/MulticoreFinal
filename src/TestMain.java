@@ -6,7 +6,18 @@ import java.util.Random;
 public class TestMain {
 
     public static void main(String[] args){
-        FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
+        // LOCK FREE PRIORITY QUEUE TESTING
+        LockFreePriorityQueue queue = new LockFreePriorityQueue();
+
+
+
+
+
+
+
+
+
+        /*FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
         Random r = new Random();
 
         for(int i = 0; i < 5; i++){
@@ -29,7 +40,7 @@ public class TestMain {
 //        try{Thread.sleep(500);}
 //        catch (InterruptedException e){}
 //
-//        System.out.println(queue);
+//        System.out.println(queue);*/
     }
 
 }
