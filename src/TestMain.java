@@ -9,10 +9,37 @@ public class TestMain {
 
         // LOCK FREE SKIP LIST TESTING
         LockFreeSkipList skipList = new LockFreeSkipList();
+        int numAdd=5, numRemove=4;
 
-        for(int i = 0; i < 5; i++){
-            skipList.add(i);
+        for(int i = 0; i < numAdd; i++){
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for(int i = 0; i < 5; i++){
+                        skipList.add(i + (Integer.parseInt(Thread.currentThread().getName()) * 5));
+                    }
+                }
+            });
+            thread.setName(Integer.toString(i));
+            thread.start();
         }
+
+        for(int i = 0; i < numRemove; i++){
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for(int i = 0; i < 5; i++){
+                        skipList.remove(i + (Integer.parseInt(Thread.currentThread().getName()) * 5));
+                    }
+                }
+            });
+            thread.setName(Integer.toString(i));
+            thread.start();
+        }
+
+        try{Thread.sleep(1000);}
+        catch (InterruptedException e){}
+
         skipList.print();
 
 
