@@ -8,7 +8,7 @@ public class TestMain {
     public static void main(String[] args){
 
         // LOCK FREE SKIP LIST TESTING
-        LockFreeSkipList skipList = new LockFreeSkipList();
+        /*LockFreeSkipList skipList = new LockFreeSkipList();
         int numAdd=5, numRemove=4;
 
         for(int i = 0; i < numAdd; i++){
@@ -40,7 +40,7 @@ public class TestMain {
         try{Thread.sleep(1000);}
         catch (InterruptedException e){}
 
-        skipList.print();
+        skipList.print();*/
 
 
 
@@ -59,7 +59,7 @@ public class TestMain {
 
 
 
-        /*FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
+        FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
         Random r = new Random();
 
         for(int i = 0; i < 5; i++){
@@ -70,10 +70,6 @@ public class TestMain {
                         int num = r.nextInt(50);
                         queue.insert(num, num);
                     }
-//                    System.out.println(queue);
-                    for(int i = 0; i < 5; i++){
-                        System.out.println(queue.remove());
-                    }
                 }
             });
             thread.start();
@@ -82,7 +78,7 @@ public class TestMain {
 //        try{Thread.sleep(500);}
 //        catch (InterruptedException e){}
 //
-//        System.out.println(queue);*/
+//        System.out.println(queue);
     }
 
 }

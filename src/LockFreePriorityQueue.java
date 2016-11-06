@@ -1,9 +1,12 @@
+import java.util.concurrent.atomic.AtomicMarkableReference;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A lock free priority queue
  */
 public class LockFreePriorityQueue {
+
+    static final int MAX_LEVEL = 10;    // Maximum height of the skiplist
 
     public LockFreePriorityQueue(){
 
@@ -24,7 +27,13 @@ public class LockFreePriorityQueue {
     private static class Node{
         int key, level, validLevel;
         Integer value;
+        AtomicMarkableReference<Node> prev;
+        AtomicMarkableReference<Node> next[];
 
+        // Constructor for a Node
+        public Node(){
+
+        }
     }
 
 }
