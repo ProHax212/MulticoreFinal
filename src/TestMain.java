@@ -6,15 +6,29 @@ import java.util.Random;
 public class TestMain {
 
     public static void main(String[] args){
-        // LOCK FREE PRIORITY QUEUE TESTING
-        LockFreePriorityQueue queue = new LockFreePriorityQueue();
 
-        SequentialSkipList skipList = new SequentialSkipList();
-        for(int i = 0; i < 10; i++) skipList.insert(i, 0);
+        // LOCK FREE SKIP LIST TESTING
+        LockFreeSkipList skipList = new LockFreeSkipList();
+
+        for(int i = 0; i < 5; i++){
+            skipList.add(i);
+        }
         skipList.print();
 
 
 
+        // LOCK FREE PRIORITY QUEUE TESTING
+        /*LockFreePriorityQueue queue = new LockFreePriorityQueue();
+
+        SequentialSkipList skipList = new SequentialSkipList();
+        Random r = new Random();
+
+        int count = 0;
+        for(int i = 0; i < 100; i++){
+            int n = r.nextInt(1000);
+            if(skipList.insert(n, n)) count += 1;
+        }
+        for(int i = 0; i < count; i++) System.out.println(skipList.deleteMin());*/
 
 
 

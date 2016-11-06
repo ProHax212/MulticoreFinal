@@ -128,6 +128,23 @@ public class SequentialSkipList {
         return true;
     }
 
+    // Remove a node
+    public Integer remove(int key){
+        Node p = find(key);
+        if(p.key != key) return null;   // Not found, return null
+
+        // Remove the entire collumn
+        Integer returnValue = p.value;
+        while(p != null){
+            p.left.right = p.right;
+            p.right.left = p.left;
+
+            p = p.up;
+        }
+
+        return returnValue;
+    }
+
     // Entry for the Skip List
     private static class Node{
         public Integer value;
@@ -143,7 +160,19 @@ public class SequentialSkipList {
         }
     }
 
-    // toString method for the Skip list
+    // Get the minimum key of the list
+    public int getMinKey(){
+        Node p = head;
+        while(p.down != null) p = p.down;
+        return p.right.key;
+    }
+
+    // Delete the node with the minimum key
+    public Integer deleteMin(){
+        return remove(getMinKey());
+    }
+
+    // Print method for the Skip list
     public void print(){
         int level = height;
         Node p = head, q = head.right;

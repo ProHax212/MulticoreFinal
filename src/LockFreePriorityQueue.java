@@ -1,3 +1,5 @@
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * A lock free priority queue
  */
@@ -16,6 +18,13 @@ public class LockFreePriorityQueue {
     public Integer remove(){
 
         return 0;
+    }
+
+    // Node class for nodes in the skiplist
+    private static class Node{
+        int key, level, validLevel;
+        Integer value;
+
     }
 
 }
