@@ -6,6 +6,35 @@ import java.util.Random;
 public class TestMain {
 
     public static void main(String[] args){
+        // LOCK FREE PRIORITY QUEUE TESTING
+        int numInsert = 100;
+        LockFreePriorityQueue lockFreePriorityQueue = new LockFreePriorityQueue();
+
+        for(int i = 0; i < numInsert; i++){
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    int numToAdd = 100;
+                    for(int i = 0; i < numToAdd; i++){
+                        int num = Integer.parseInt(Thread.currentThread().getName()) * numToAdd + i;
+                        lockFreePriorityQueue.insert(num, num);
+                    }
+                }
+            });
+            thread.setName(Integer.toString(i));
+            thread.start();
+        }
+
+        try{Thread.sleep(1000);}
+        catch (InterruptedException e){}
+
+        System.out.println("Done");
+        System.out.println(lockFreePriorityQueue);
+        System.out.print(lockFreePriorityQueue.verify());
+
+
+
+
 
         // LOCK FREE SKIP LIST TESTING
         /*LockFreeSkipList skipList = new LockFreeSkipList();
