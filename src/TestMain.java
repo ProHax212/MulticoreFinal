@@ -5,35 +5,47 @@ import java.util.Random;
  */
 public class TestMain {
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         // LOCK FREE PRIORITY QUEUE TESTING
         int numInsert = 100;
+        int numDelete = 200;
         LockFreePriorityQueue lockFreePriorityQueue = new LockFreePriorityQueue();
+        Random r = new Random();
 
-        for(int i = 0; i < numInsert; i++){
+        for(int i = 0; i < 10000; i++){
+            int num = r.nextInt(10000);
+            lockFreePriorityQueue.insert(num, num);
+        }
+
+        for (int i = 0; i < numInsert; i++) {
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int numToAdd = 100;
-                    for(int i = 0; i < numToAdd; i++){
-                        int num = Integer.parseInt(Thread.currentThread().getName()) * numToAdd + i;
-                        lockFreePriorityQueue.insert(num, num);
-                    }
+                    int num = r.nextInt(1000);
+                    for (int i = 0; i < 50; i++) lockFreePriorityQueue.insert(num, num);
                 }
             });
-            thread.setName(Integer.toString(i));
+            //thread.start();
+        }
+
+        for (int i = 0; i < numDelete; i++) {
+            Thread thread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for (int i = 0; i < 50; i++) System.out.println(lockFreePriorityQueue.deleteMin());
+                }
+            });
             thread.start();
         }
 
-        try{Thread.sleep(1000);}
-        catch (InterruptedException e){}
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-        System.out.println("Done");
         System.out.println(lockFreePriorityQueue);
-        System.out.print(lockFreePriorityQueue.verify());
-
-
-
+        System.out.println(lockFreePriorityQueue.verify());
 
 
         // LOCK FREE SKIP LIST TESTING
@@ -72,23 +84,8 @@ public class TestMain {
         skipList.print();*/
 
 
-
-        // LOCK FREE PRIORITY QUEUE TESTING
-        /*LockFreePriorityQueue queue = new LockFreePriorityQueue();
-
-        SequentialSkipList skipList = new SequentialSkipList();
-        Random r = new Random();
-
-        int count = 0;
-        for(int i = 0; i < 100; i++){
-            int n = r.nextInt(1000);
-            if(skipList.insert(n, n)) count += 1;
-        }
-        for(int i = 0; i < count; i++) System.out.println(skipList.deleteMin());*/
-
-
-
-        FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
+        // FINE GRAINED PRIORITY QUEUE TESTING
+        /*FineGrainedPriorityQueue queue = new FineGrainedPriorityQueue();
         Random r = new Random();
 
         for(int i = 0; i < 5; i++){
@@ -107,7 +104,7 @@ public class TestMain {
 //        try{Thread.sleep(500);}
 //        catch (InterruptedException e){}
 //
-//        System.out.println(queue);
-    }
+//        System.out.println(queue);*/
 
+    }
 }

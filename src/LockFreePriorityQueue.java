@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicStampedReference;
  */
 public class LockFreePriorityQueue {
 
-    static final int MAX_LEVEL = 100;    // Maximum height of the skiplist
+    static final int MAX_LEVEL = 25;    // Maximum height of the skiplist
     final AtomicMarkableReference<Node> head = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE), false);
     final AtomicMarkableReference<Node> tail = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE), false);
 
@@ -37,20 +37,29 @@ public class LockFreePriorityQueue {
         else return node;
     }
 
-    private Wrapper removeNode(AtomicMarkableReference<Node> node, AtomicMarkableReference<Node> prev, int level){
+    private void removeNode(AtomicMarkableReference<Node> node, AtomicMarkableReference<Node> prev, int level){
         AtomicMarkableReference<Node> last;
-        Wrapper w = new Wrapper(node, prev);
-        /*while (true){
-            if(node.getReference().next[level].getReference() == null) break;
-            w = scanKey(prev, level, node.getReference().key);
-        }*/
+        Node nodeRef = node.getReference();
+        while (true){
+            if(node.getReference().next[level] == null && node.getReference().next[level].isMarked()) break;
+            Wrapper w = scanKey(prev, level, node.getReference().key);
+            last = w.node;
+            prev = w.prev;
 
-        return w;
+            if((last.getReference() != node.getReference()) || (node.getReference().next[level] == null && node.getReference().next[level].isMarked())) break;
+            if(prev.getReference().next[level].compareAndSet(node.getReference(), node.getReference().next[level].getReference(), false, false)){
+                nodeRef.next[level] = new AtomicMarkableReference<>(null, true);
+                break;
+            }
+            if(node.getReference().next[level].getReference() == null && node.getReference().next[level].isMarked()) break;
+
+            Thread.yield(); // Back off
+        }
     }
 
     private AtomicMarkableReference<Node> helpDelete(AtomicMarkableReference<Node> node, int level){
         AtomicMarkableReference<Node> prev, last, node2;
-        for(int i = level; i >= 1; i--){
+        for(int i = level; i >= node.getReference().level - 1; i--){
             do{
                 node2 = node.getReference().next[i];
             }while(!node2.isMarked() && (!node.compareAndSet(node2.getReference(), node2.getReference(), false, true)));
@@ -59,8 +68,8 @@ public class LockFreePriorityQueue {
         if(prev.getReference() == null || level >= prev.getReference().validLevel){
             prev = head;
         }
-        Wrapper w = removeNode(node, prev, level);
-        return w.prev;
+        removeNode(node, prev, level);
+        return prev;
     }
 
     private Wrapper readNext(AtomicMarkableReference<Node> node1, int level){
@@ -149,9 +158,50 @@ public class LockFreePriorityQueue {
     }
 
     // Pop off the top priority in the queue
-    public Integer remove(){
+    public Integer deleteMin(){
+        AtomicMarkableReference<Node> prev = head;
+        AtomicMarkableReference<Node> node1 = new AtomicMarkableReference<Node>(null, false);
+        AtomicMarkableReference<Node> node2;
+        AtomicMarkableReference<Integer> value;
 
-        return 0;
+        // Loop until you find the min
+        boolean retry = false;  // Used to simulate the goto operation in the psuedocode
+        while(true){
+
+            if(!retry) {
+                Wrapper w = readNext(prev, 0);
+                prev = w.prev;
+                node1 = w.node;
+
+                // Node is the tail
+                if (node1.getReference().value.getReference() == Integer.MAX_VALUE) return null;
+            }
+
+            retry = true;
+            value = node1.getReference().value;
+            if(node1.getReference() != prev.getReference().next[0].getReference()) continue;
+            if(!value.isMarked()){
+                if(node1.getReference().value.compareAndSet(value.getReference(), value.getReference(), false, true)){
+                    node1.getReference().prev = prev;
+                    break;
+                }else continue;
+            }else if(value.isMarked()) node1 = helpDelete(node1, 0);
+
+            prev = node1;
+            retry = false;
+        }
+
+        for(int i = 0; i < node1.getReference().level-1; i++){
+            do{
+                node2 = node1.getReference().next[i];
+            }while(!node2.isMarked() && !node1.getReference().next[i].compareAndSet(node2.getReference(), node2.getReference(), false, true));
+        }
+        prev = head;
+        for(int i = node1.getReference().level-1; i >= 0; i--){
+            removeNode(node1, prev, i);
+        }
+
+        return value.getReference();
     }
 
     // Node class for nodes in the skiplist
