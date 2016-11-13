@@ -11,14 +11,17 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 public class LockFreePriorityQueue {
 
     static final int MAX_LEVEL = 25;    // Maximum height of the skiplist
-    final AtomicMarkableReference<Node> head = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE), false);
-    final AtomicMarkableReference<Node> tail = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE), false);
+    //final AtomicMarkableReference<Node> head = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE), false);
+    //final AtomicMarkableReference<Node> tail = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE), false);
+
+    final Node head = new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE);
+    final Node tail = new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE);
 
     Random r = new Random();
 
     public LockFreePriorityQueue(){
-        for(int i = 0; i < head.getReference().next.length; i++){
-            head.getReference().next[i] = new AtomicMarkableReference<Node>(tail.getReference(), false);
+        for(int i = 0; i < head.next.length; i++){
+            head.next[i] = new AtomicMarkableReference<Node>(tail, false);
         }
     }
 
@@ -32,73 +35,99 @@ public class LockFreePriorityQueue {
         return startingLevel;
     }
 
-    private AtomicMarkableReference<Node> readNode(AtomicMarkableReference<Node> node){
+    private Node readNode(AtomicMarkableReference<Node> node){
         if(node.isMarked()) return null;
-        else return node;
+        else return node.getReference();
     }
 
-    private void removeNode(AtomicMarkableReference<Node> node, AtomicMarkableReference<Node> prev, int level){
-        AtomicMarkableReference<Node> last;
-        Node nodeRef = node.getReference(); Node lastRef;  Node prevRef = prev.getReference();
+    private void removeNode(Node node, Node prev, int level){
+        Node last;
+
         while (true){
-            nodeRef = node.getReference();
-            if(nodeRef.next[level] == null && nodeRef.next[level].isMarked()) break;
-            Wrapper w = scanKey(prev, level, nodeRef.key);
+            // Already removed
+            if(node.next[level].getReference() == null && node.next[level].isMarked()) break;
+
+            // Find right position of previous node
+            Wrapper w = scanKey(prev, level, node.key);
             last = w.node;
             prev = w.prev;
-            lastRef = last.getReference();
 
-            if((lastRef != nodeRef) || (nodeRef.next[level] == null && nodeRef.next[level].isMarked())) break;
-            if(prevRef.next[level].compareAndSet(nodeRef, nodeRef.next[level].getReference(), false, false)){
-                nodeRef.next[level] = new AtomicMarkableReference<>(null, true);
+            // Verify node is still part of linked list
+            if((last != node) || (node.next[level].getReference() == null && node.next[level].isMarked())) break;
+            // My previous node points to my next node (i'm removed)
+            if(prev.next[level].compareAndSet(node, node.next[level].getReference(), false, false)){
+                node.next[level] = new AtomicMarkableReference<>(null, true);
                 break;
             }
-            if(nodeRef.next[level].getReference() == null && nodeRef.next[level].isMarked()) break;
+
+
+            if(node.next[level].getReference() == null && node.next[level].isMarked()) break;
 
             Thread.yield(); // Back off
         }
     }
 
-    private AtomicMarkableReference<Node> helpDelete(AtomicMarkableReference<Node> node, int level){
-        AtomicMarkableReference<Node> prev, last, node2;
-        Node nodeRef = node.getReference(); Node node2Ref; Node prevRef;
-        for(int i = level; i <= node.getReference().level - 1; i++){
+    // Delete at the current level - return reference to previous node
+    private Node helpDelete(Node node, int level){
+        Node last, node2, prev;
+        boolean node2Marked;
+
+        // Set deletion on all next pointers at higher levels
+        node2 = new Node(0,0,0);
+        for(int i = level; i <= node.level - 1; i++){
+            // Repeat until successfully sets next ptr to marked
             do{
-                node2 = nodeRef.next[i];
-                node2Ref = node2.getReference();
-            }while(!node2.isMarked() && (!nodeRef.next[i].compareAndSet(node2Ref, node2Ref, false, true)));
+                node2 = node.next[i].getReference();
+                node2Marked = node.next[i].isMarked();
+            }while(!node2Marked && (!node.next[i].compareAndSet(node2, node2, false, true)));
         }
-        prev = nodeRef.prev;
-        prevRef = prev.getReference();
-        if(prevRef == null || level >= prevRef.validLevel){
+
+        prev = node.prev;
+
+        // Make sure prev is valid for deletion
+        // If not, search for correct previous node
+        if(prev == null || level >= prev.validLevel){
             prev = head;
-            for(int i = MAX_LEVEL-1; i >= level; i--) scanKey(prev, i, nodeRef.key);
+            // Search for correct previous node
+            for(int i = MAX_LEVEL-1; i >= level; i--) {
+                Wrapper w = scanKey(prev, i, node.key);
+                node2 = w.node;
+                prev = w.prev;
+            }
         }
-        removeNode(node, prev, level);
+
+        // Delete the node at the current level
+        removeNode(node, prev, level);  // Remove the node at the level
         return prev;
     }
 
-    private Wrapper readNext(AtomicMarkableReference<Node> node1, int level){
-        AtomicMarkableReference<Node> node2;
-        if(node1.getReference().value.isMarked()) node1 = helpDelete(node1, level);
-        node2 = readNode(node1.getReference().next[level]);
+    // Return the next node helping nodes that need to be deleted
+    private Wrapper readNext(Node node1, int level){
+        Node node2;
 
+        // Marked - help delete the node
+        if(node1.value.isMarked()) node1 = helpDelete(node1, level);
+        node2 = readNode(node1.next[level]);
+
+        // Keep reading nodes until they aren't Null
+        // Helpdelete them if they're null
         while(node2 == null){
             node1 = helpDelete(node1, level);
-            node2 = readNode(node1.getReference().next[level]);
+            node2 = readNode(node1.next[level]);
         }
 
         return new Wrapper(node2, node1);
     }
 
-    private Wrapper scanKey(AtomicMarkableReference<Node> node1, int level, int key){
-        AtomicMarkableReference<Node> node2;
+    // Find a node on the current level that has the same(or higher) key
+    private Wrapper scanKey(Node node1, int level, int key){
+        Node node2;
         Wrapper w = readNext(node1, level);
         node1 = w.prev;
         node2 = w.node;
 
         // Loop while key is less
-        while(node2.getReference().key < key){
+        while(node2.key < key){
             node1 = node2;
             w = readNext(node1, level);
             node1 = w.prev;
@@ -110,54 +139,63 @@ public class LockFreePriorityQueue {
 
     // Enqueue a value/priority pair into the queue
     public boolean insert(Integer value, int key){
-        AtomicMarkableReference<Node> node1, node2, newNode;
-        AtomicMarkableReference<Node>[] savedNodes = new AtomicMarkableReference[MAX_LEVEL];
-        node1 = head;
+        Node node1, node2, newNode;
+        Node savedNodes[] = new Node[MAX_LEVEL];
         int level = randomLevel();
         if(level == 0) level = 1;
-        newNode = new AtomicMarkableReference<>(new Node(level, key, value), false);
+        newNode = new Node(level, key, value);
+        node1 = head;
 
         // Loop through the levels
-        for(int i = MAX_LEVEL; i >= 1; i--){
+        for(int i = MAX_LEVEL - 1; i >= 1; i--){
+            // Find where to put node at this level
             Wrapper w = scanKey(node1, i, key);
             node2 = w.node;
             node1 = w.prev;
+            // Remember last node at the level for later use
             if(i < level) savedNodes[i] = node1;
         }
 
         while(true){
+            // Find where to insert at lowest level
             Wrapper w = scanKey(node1, 0, key);
             node1 = w.prev;
             node2 = w.node;
-            AtomicMarkableReference<Integer> value2 = node2.getReference().value;
+            Integer value2 = node2.value.getReference();
+            boolean value2Mark = node2.value.isMarked();
             // Found the same key, update the value
-            if(!value2.isMarked() && node2.getReference().key == key){
-                if(node2.getReference().value.compareAndSet(value2.getReference(), value, false, false)){
+            if(!value2Mark && node2.key == key){
+                if(node2.value.compareAndSet(value2, value, false, false)){
                     return true;
                 }
             }
 
-            newNode.getReference().next[0] = new AtomicMarkableReference<Node>(node2.getReference(), false);
-            if(node1.getReference().next[0].compareAndSet(node2.getReference(), newNode.getReference(), false, false)) break;
+            // Add at lowest level
+            newNode.next[0] = new AtomicMarkableReference<Node>(node2, false);
+            if(node1.next[0].compareAndSet(node2, newNode, false, false)) break;
+
             Thread.yield(); // Back off
         }
 
         // Insert at higher levels
         for(int i = 1; i <= level-1; i++){
-            newNode.getReference().validLevel = i;
+            newNode.validLevel = i;
             node1 = savedNodes[i];
             while(true){
                 Wrapper w = scanKey(node1, i, key);
                 node1 = w.prev;
                 node2 = w.node;
-                newNode.getReference().next[i] = new AtomicMarkableReference<>(node2.getReference(), false);
-                if(newNode.isMarked() || node1.getReference().next[i].compareAndSet(node2.getReference(), newNode.getReference(), node2.isMarked(), node2.isMarked())) break;
+                newNode.next[i] = new AtomicMarkableReference<>(node2, false);
+                // New node was deleted at lowest level
+                if(newNode.value.isMarked() || node1.next[i].compareAndSet(node2, newNode, node1.next[i].isMarked(), node1.next[i].isMarked())) break;
                 Thread.yield(); // Back off
             }
         }
-        newNode.getReference().validLevel = level;
-        if(newNode.getReference().value.isMarked()){
-            helpDelete(newNode, 0);
+        newNode.validLevel = level;
+
+        // New node deleted at lowest level
+        if(newNode.value.isMarked()){
+            newNode = helpDelete(newNode, 0);
         }
 
         return true;
@@ -165,56 +203,64 @@ public class LockFreePriorityQueue {
 
     // Pop off the top priority in the queue
     public Integer deleteMin(){
-        AtomicMarkableReference<Node> prev = head;
-        AtomicMarkableReference<Node> node1 = new AtomicMarkableReference<Node>(null, false);
-        AtomicMarkableReference<Node> node2;
-        AtomicMarkableReference<Integer> value;
-        Node node1Ref = node1.getReference(), node2Ref, prevRef = node1.getReference();
+        Node prev = head;
+        Node node1 = new Node(0, 0, 0); Node node2;
         Integer valueRef;
-        boolean valueMark, node1Mark, node2Mark;
 
-        // Loop until you find the min
+        // Loop until you find the first node thats not marked
         boolean retry = false;  // Used to simulate the goto operation in the psuedocode
         while(true){
-
             if(!retry) {
                 Wrapper w = readNext(prev, 0);
                 prev = w.prev;
                 node1 = w.node;
-                node1Ref = node1.getReference();
 
                 // Node is the tail
-                if (node1Ref.value.getReference() == Integer.MAX_VALUE) return null;
+                if (node1 == tail) return null;
             }
 
             retry = true;
-            value = node1Ref.value;
-            valueRef = value.getReference();
-            valueMark = value.isMarked();
-            if(node1Ref != prevRef.next[0].getReference()) continue;
+            boolean valueMark = node1.value.isMarked();
+            valueRef = node1.value.getReference();
+
+            //Node isn't the next pointer of prev - continue
+            if(node1 != prev.next[0].getReference()){
+                retry = false;
+                continue;
+            }
+
+            // Node wasn't marked for deletion
             if(!valueMark){
-                if(node1Ref.value.compareAndSet(valueRef, valueRef, false, true)){
-                    node1Ref.prev = prev;
+                // Mark for deletion
+                if(node1.value.compareAndSet(valueRef, valueRef, false, true)){
+                    node1.prev = prev;   // Set previous for better time
                     break;
                 }else continue;
-            }else if(valueMark){
+            }
+            // Node was marked, help delete
+            else if(valueMark){
                 node1 = helpDelete(node1, 0);
             }
 
+            // Didn't find an unmarked node - continue
             prev = node1;
-            prevRef = node1.getReference();
             retry = false;
         }
 
-        for(int i = 0; i < node1.getReference().level-1; i++){
+        // Mark all of the next pointers
+        boolean node2Marked;
+        for(int i = 0; i <= node1.level-1; i++){
+            // Keep trying until you mark next ptr
             do{
-                node2 = node1.getReference().next[i];
-                node2Ref = node2.getReference();
-                node2Mark = node2.isMarked();
-            }while(!node2Mark && !node1Ref.next[i].compareAndSet(node2Ref, node2Ref, false, true));
+                node2 = node1.next[i].getReference();
+                node2Marked = node1.next[i].isMarked();
+            }while(!node2Marked && !node1.next[i].compareAndSet(node2, node2, false, true));
         }
+
         prev = head;
-        for(int i = node1.getReference().level-1; i >= 0; i--){
+
+        // Remove the nodes starting from the top
+        for(int i = node1.level-1; i >= 0; i--){
             removeNode(node1, prev, i);
         }
 
@@ -225,7 +271,7 @@ public class LockFreePriorityQueue {
     private static class Node{
         int key, level, validLevel;
         AtomicMarkableReference<Integer> value; // Mark for the current node
-        AtomicMarkableReference<Node> prev;
+        Node prev;
         AtomicMarkableReference<Node> next[];
 
         // Constructor for normal Nodes
@@ -246,46 +292,28 @@ public class LockFreePriorityQueue {
 
     // Wrapper class used so ReadNext and ScanKey can return the node as well as previous
     private static class Wrapper{
-        AtomicMarkableReference<Node> node, prev;
+        Node node, prev;
 
-        public Wrapper(AtomicMarkableReference<Node> node, AtomicMarkableReference<Node> prev){
+        public Wrapper(Node node, Node prev){
             this.node = node;
             this.prev = prev;
         }
-    }
-
-    public void print(){
-        System.out.println();
-        int level = MAX_LEVEL-1;
-        AtomicMarkableReference<Node> node1 = head;
-
-        while(level >= 0){
-            AtomicMarkableReference<Node> node2 = node1.getReference().next[level];
-            System.out.print(head.getReference().key + ", ");
-            while(node2 != null){
-                System.out.print(node2.getReference().key + ", ");
-                node2 = node2.getReference().next[level];
-            }
-            level -= 1;
-            System.out.println();
-        }
-
-        System.out.println();
     }
 
     // To string method for debugging
     public String toString(){
         String returnString = "\n";
         int level = MAX_LEVEL-1;
-        AtomicMarkableReference<Node> node1 = head;
+        Node node1 = head;
 
         while(level >= 0){
-            AtomicMarkableReference<Node> node2 = node1.getReference().next[level];
-            returnString += head.getReference().key + ", ";
-            while(node2 != null){
-                returnString += node2.getReference().key + ", ";
-                node2 = node2.getReference().next[level];
+            Node node2 = node1.next[level].getReference();
+            returnString += head.key + ", ";
+            while(node2 != tail){
+                returnString += node2.key + ", ";
+                node2 = node2.next[level].getReference();
             }
+            returnString += tail.key + ", ";
             level -= 1;
             returnString += "\n";
         }
@@ -299,11 +327,11 @@ public class LockFreePriorityQueue {
         int level = MAX_LEVEL-1;
 
         while(level >= 0){
-            AtomicMarkableReference<Node> node1 = head;
-            AtomicMarkableReference<Node> node2 = node1.getReference().next[level];
-            while(node2 != null){
-                if (node2.getReference().key < node1.getReference().key) return false;
-                node2 = node2.getReference().next[level];
+            Node node1 = head;
+            Node node2 = node1.next[level].getReference();
+            while(node2 != tail){
+                if (node2.key < node1.key) return false;
+                node2 = node2.next[level].getReference();
             }
             level -= 1;
         }

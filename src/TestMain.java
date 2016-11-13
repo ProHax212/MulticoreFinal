@@ -9,32 +9,32 @@ public class TestMain {
 
     public static void main(String[] args) {
         // LOCK FREE PRIORITY QUEUE TESTING
-        int numInserters = 300; int numDeleters = 200;
+        int numInserters = 200; int numDeleters = 200;
         int numInsert = 200; int numDelete = 200;
         LockFreePriorityQueue lockFreePriorityQueue = new LockFreePriorityQueue();
         Random r = new Random();
 
-        for(int i = 0; i < 10000; i++){
-            int num = r.nextInt(10000);
-            lockFreePriorityQueue.insert(num, num);
-        }
+//        for(int i = 0; i < numDeleters*numDelete; i++){
+//            int num = r.nextInt();
+//            lockFreePriorityQueue.insert(num, num);
+//        }
 
         for (int i = 0; i < numInserters; i++) {
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    int num = r.nextInt(1000);
+                    int num = Math.abs(r.nextInt());
                     for (int i = 0; i < numInsert; i++) lockFreePriorityQueue.insert(num, num);
                 }
             });
-            //thread.start();
+            thread.start();
         }
 
         for (int i = 0; i < numDeleters; i++) {
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    for (int i = 0; i < numDelete; i++) System.out.println(lockFreePriorityQueue.deleteMin());
+                    for (int i = 0; i < numDelete; i++) lockFreePriorityQueue.deleteMin();
                 }
             });
             thread.start();
