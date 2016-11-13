@@ -1,6 +1,7 @@
 import javafx.util.Pair;
 
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicMarkableReference;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicStampedReference;
@@ -106,7 +107,7 @@ public class LockFreePriorityQueue {
         Node node2;
 
         // Marked - help delete the node
-        if(node1.value.isMarked()) node1 = helpDelete(node1, level);
+        if(node1.marked.get()) node1 = helpDelete(node1, level);
         node2 = readNode(node1.next[level]);
 
         // Keep reading nodes until they aren't Null
@@ -162,13 +163,10 @@ public class LockFreePriorityQueue {
             Wrapper w = scanKey(node1, 0, key);
             node1 = w.prev;
             node2 = w.node;
-            Integer value2 = node2.value.getReference();
-            boolean value2Mark = node2.value.isMarked();
+            Integer value2 = node2.value;
             // Found the same key, update the value
-            if(!value2Mark && node2.key == key){
-                if(node2.value.compareAndSet(value2, value, false, false)){
-                    return true;
-                }
+            if(!node2.marked.get() && node2.key == key){
+                return false;
             }
 
             // Add at lowest level
@@ -188,14 +186,14 @@ public class LockFreePriorityQueue {
                 node2 = w.node;
                 newNode.next[i] = new AtomicMarkableReference<>(node2, false);
                 // New node was deleted at lowest level
-                if(newNode.value.isMarked() || node1.next[i].compareAndSet(node2, newNode, node1.next[i].isMarked(), node1.next[i].isMarked())) break;
+                if(newNode.marked.get() || node1.next[i].compareAndSet(node2, newNode, node1.next[i].isMarked(), node1.next[i].isMarked())) break;
                 Thread.yield(); // Back off
             }
         }
         newNode.validLevel = level;
 
         // New node deleted at lowest level
-        if(newNode.value.isMarked()){
+        if(newNode.marked.get()){
             newNode = helpDelete(newNode, 0);
         }
 
@@ -221,8 +219,8 @@ public class LockFreePriorityQueue {
             }
 
             retry = true;
-            boolean valueMark = node1.value.isMarked();
-            valueRef = node1.value.getReference();
+//            boolean valueMark = node1.value.isMarked();
+//            valueRef = node1.value.getReference();
 
             //Node isn't the next pointer of prev - continue
             if(node1 != prev.next[0].getReference()){
@@ -231,15 +229,15 @@ public class LockFreePriorityQueue {
             }
 
             // Node wasn't marked for deletion
-            if(!valueMark){
+            if(!node1.marked.get()){
                 // Mark for deletion
-                if(node1.value.compareAndSet(valueRef, valueRef, false, true)){
+                if(node1.marked.compareAndSet(false, true)){
                     node1.prev = prev;   // Set previous for better time
                     break;
                 }else continue;
             }
             // Node was marked, help delete
-            else if(valueMark){
+            else{
                 node1 = helpDelete(node1, 0);
             }
 
@@ -265,29 +263,42 @@ public class LockFreePriorityQueue {
             removeNode(node1, prev, i);
         }
 
-        return valueRef;
+        return node1.value;
     }
 
     // Node class for nodes in the skiplist
     private static class Node{
         int key, level, validLevel;
-        AtomicMarkableReference<Integer> value; // Mark for the current node
+        Integer value; // Mark for the current node
         Node prev;
         AtomicMarkableReference<Node> next[];
+        AtomicBoolean marked;
 
         // Constructor for normal Nodes
         public Node(int level, int key, int value){
             prev = null;
+            marked = new AtomicBoolean(false);
             validLevel = 0;
             this.level = level;
             this.key = key;
-            this.value = new AtomicMarkableReference<>(value, false);
-            this.next = new AtomicMarkableReference[level];
+            this.value = value;
+            this.next = new AtomicMarkableReference[level + 1];
+            for(int i = 0; i < this.next.length; i++){
+                next[i] = new AtomicMarkableReference<>(null, false);
+            }
         }
 
-        // Constructor for a Node
-        public Node(){
-
+        // Constructor for sentinel nodes
+        public Node(int key){
+            validLevel = 0;
+            prev = null;
+            value = null;
+            this.key = key;
+            this.next = new AtomicMarkableReference[MAX_LEVEL+1];
+            for(int i = 0; i < next.length; i++){
+                next[i] = new AtomicMarkableReference<Node>(null, false);
+            }
+            level = MAX_LEVEL;
         }
     }
 
