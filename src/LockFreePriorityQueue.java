@@ -39,19 +39,21 @@ public class LockFreePriorityQueue {
 
     private void removeNode(AtomicMarkableReference<Node> node, AtomicMarkableReference<Node> prev, int level){
         AtomicMarkableReference<Node> last;
-        Node nodeRef = node.getReference();
+        Node nodeRef = node.getReference(); Node lastRef;  Node prevRef = prev.getReference();
         while (true){
-            if(node.getReference().next[level] == null && node.getReference().next[level].isMarked()) break;
-            Wrapper w = scanKey(prev, level, node.getReference().key);
+            nodeRef = node.getReference();
+            if(nodeRef.next[level] == null && nodeRef.next[level].isMarked()) break;
+            Wrapper w = scanKey(prev, level, nodeRef.key);
             last = w.node;
             prev = w.prev;
+            lastRef = last.getReference();
 
-            if((last.getReference() != node.getReference()) || (node.getReference().next[level] == null && node.getReference().next[level].isMarked())) break;
-            if(prev.getReference().next[level].compareAndSet(node.getReference(), node.getReference().next[level].getReference(), false, false)){
+            if((lastRef != nodeRef) || (nodeRef.next[level] == null && nodeRef.next[level].isMarked())) break;
+            if(prevRef.next[level].compareAndSet(nodeRef, nodeRef.next[level].getReference(), false, false)){
                 nodeRef.next[level] = new AtomicMarkableReference<>(null, true);
                 break;
             }
-            if(node.getReference().next[level].getReference() == null && node.getReference().next[level].isMarked()) break;
+            if(nodeRef.next[level].getReference() == null && nodeRef.next[level].isMarked()) break;
 
             Thread.yield(); // Back off
         }
@@ -59,14 +61,18 @@ public class LockFreePriorityQueue {
 
     private AtomicMarkableReference<Node> helpDelete(AtomicMarkableReference<Node> node, int level){
         AtomicMarkableReference<Node> prev, last, node2;
-        for(int i = level; i >= node.getReference().level - 1; i--){
+        Node nodeRef = node.getReference(); Node node2Ref; Node prevRef;
+        for(int i = level; i <= node.getReference().level - 1; i++){
             do{
-                node2 = node.getReference().next[i];
-            }while(!node2.isMarked() && (!node.compareAndSet(node2.getReference(), node2.getReference(), false, true)));
+                node2 = nodeRef.next[i];
+                node2Ref = node2.getReference();
+            }while(!node2.isMarked() && (!nodeRef.next[i].compareAndSet(node2Ref, node2Ref, false, true)));
         }
-        prev = node.getReference().prev;
-        if(prev.getReference() == null || level >= prev.getReference().validLevel){
+        prev = nodeRef.prev;
+        prevRef = prev.getReference();
+        if(prevRef == null || level >= prevRef.validLevel){
             prev = head;
+            for(int i = MAX_LEVEL-1; i >= level; i--) scanKey(prev, i, nodeRef.key);
         }
         removeNode(node, prev, level);
         return prev;
@@ -163,6 +169,9 @@ public class LockFreePriorityQueue {
         AtomicMarkableReference<Node> node1 = new AtomicMarkableReference<Node>(null, false);
         AtomicMarkableReference<Node> node2;
         AtomicMarkableReference<Integer> value;
+        Node node1Ref = node1.getReference(), node2Ref, prevRef = node1.getReference();
+        Integer valueRef;
+        boolean valueMark, node1Mark, node2Mark;
 
         // Loop until you find the min
         boolean retry = false;  // Used to simulate the goto operation in the psuedocode
@@ -172,36 +181,44 @@ public class LockFreePriorityQueue {
                 Wrapper w = readNext(prev, 0);
                 prev = w.prev;
                 node1 = w.node;
+                node1Ref = node1.getReference();
 
                 // Node is the tail
-                if (node1.getReference().value.getReference() == Integer.MAX_VALUE) return null;
+                if (node1Ref.value.getReference() == Integer.MAX_VALUE) return null;
             }
 
             retry = true;
-            value = node1.getReference().value;
-            if(node1.getReference() != prev.getReference().next[0].getReference()) continue;
-            if(!value.isMarked()){
-                if(node1.getReference().value.compareAndSet(value.getReference(), value.getReference(), false, true)){
-                    node1.getReference().prev = prev;
+            value = node1Ref.value;
+            valueRef = value.getReference();
+            valueMark = value.isMarked();
+            if(node1Ref != prevRef.next[0].getReference()) continue;
+            if(!valueMark){
+                if(node1Ref.value.compareAndSet(valueRef, valueRef, false, true)){
+                    node1Ref.prev = prev;
                     break;
                 }else continue;
-            }else if(value.isMarked()) node1 = helpDelete(node1, 0);
+            }else if(valueMark){
+                node1 = helpDelete(node1, 0);
+            }
 
             prev = node1;
+            prevRef = node1.getReference();
             retry = false;
         }
 
         for(int i = 0; i < node1.getReference().level-1; i++){
             do{
                 node2 = node1.getReference().next[i];
-            }while(!node2.isMarked() && !node1.getReference().next[i].compareAndSet(node2.getReference(), node2.getReference(), false, true));
+                node2Ref = node2.getReference();
+                node2Mark = node2.isMarked();
+            }while(!node2Mark && !node1Ref.next[i].compareAndSet(node2Ref, node2Ref, false, true));
         }
         prev = head;
         for(int i = node1.getReference().level-1; i >= 0; i--){
             removeNode(node1, prev, i);
         }
 
-        return value.getReference();
+        return valueRef;
     }
 
     // Node class for nodes in the skiplist

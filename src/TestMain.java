@@ -1,4 +1,6 @@
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Main program for testing
@@ -7,8 +9,8 @@ public class TestMain {
 
     public static void main(String[] args) {
         // LOCK FREE PRIORITY QUEUE TESTING
-        int numInsert = 100;
-        int numDelete = 200;
+        int numInserters = 300; int numDeleters = 200;
+        int numInsert = 200; int numDelete = 200;
         LockFreePriorityQueue lockFreePriorityQueue = new LockFreePriorityQueue();
         Random r = new Random();
 
@@ -17,29 +19,29 @@ public class TestMain {
             lockFreePriorityQueue.insert(num, num);
         }
 
-        for (int i = 0; i < numInsert; i++) {
+        for (int i = 0; i < numInserters; i++) {
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
                     int num = r.nextInt(1000);
-                    for (int i = 0; i < 50; i++) lockFreePriorityQueue.insert(num, num);
+                    for (int i = 0; i < numInsert; i++) lockFreePriorityQueue.insert(num, num);
                 }
             });
             //thread.start();
         }
 
-        for (int i = 0; i < numDelete; i++) {
+        for (int i = 0; i < numDeleters; i++) {
             Thread thread = new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    for (int i = 0; i < 50; i++) System.out.println(lockFreePriorityQueue.deleteMin());
+                    for (int i = 0; i < numDelete; i++) System.out.println(lockFreePriorityQueue.deleteMin());
                 }
             });
             thread.start();
         }
 
         try {
-            Thread.sleep(1000);
+            Thread.sleep(2000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
