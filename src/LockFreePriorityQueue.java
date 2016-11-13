@@ -143,6 +143,7 @@ public class LockFreePriorityQueue {
         Node savedNodes[] = new Node[MAX_LEVEL];
         int level = randomLevel();
         if(level == 0) level = 1;
+        if(level >= MAX_LEVEL) level = MAX_LEVEL - 1;
         newNode = new Node(level, key, value);
         node1 = head;
 

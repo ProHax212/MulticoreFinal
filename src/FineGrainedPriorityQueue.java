@@ -7,138 +7,143 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class FineGrainedPriorityQueue {
 
-    private ArrayList<Node> heap;
+    private Node[] heap;
+    private static int root = 1;
     private ReentrantLock heapLock;
-    private AtomicInteger size;
+    int nextIndex;
 
-    public FineGrainedPriorityQueue(){
-        heap = new ArrayList<>();
-
-        // Add sentinel node so the root sits at index 1
-        Node sentinel = new Node(42, 1, -2L);    // Sentinel is tagged as empty
-        heap.add(sentinel);  // Sentinel node
-        size = new AtomicInteger(0);
+    public FineGrainedPriorityQueue(int capacity){
+        heap = new Node[capacity+1];
+        for(int i = 0; i < capacity+1; i++){
+            heap[i] = new Node();
+        }
+        nextIndex = root;
 
         heapLock = new ReentrantLock();
     }
 
     // Insert a new node into the priority queue
-    public void insert(Integer value, int priority){
+    public boolean insert(Integer value, int priority){
         // Temporarily lock the heap while adding
         heapLock.lock();
-        int index = heap.size();
-        heap.add(new Node(value, priority, Thread.currentThread().getId()));
-        heapLock.unlock();
+        int index = nextIndex;
+        if((index*2 + 1) >= heap.length){
+            heapLock.unlock();
+            return false;  // Not enough room
+        }
+        nextIndex += 1;
+        heap[index].lock(); heapLock.unlock();
+        heap[index].priority = priority;
+        heap[index].tag = Thread.currentThread().getId();
+        heap[index].unlock();
 
         // Percolate up while priority is higher than parent
-        while(index > 1){
-            int parent=getParent(index); heap.get(parent).lock.lock(); heap.get(index).lock.lock();
+        boolean Done = false;
+        while(index > 1 && !Done){
+            int parent = index/2; heap[parent].lock(); heap[index].lock();
 
             // Parent is available and the current node is tagged by me
-            if(heap.get(parent).tag == -1L && heap.get(index).tag == Thread.currentThread().getId()){
+            if(heap[parent].tag == -1L && heap[index].tag == Thread.currentThread().getId()){
                 // Parent has lower priority - swap them
-                if(heap.get(parent).priority > heap.get(index).priority){
-                    swapNodes(heap.get(parent), heap.get(index));
-                    heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();  // Unlock the locks
-                    index = parent;
+                if(heap[parent].priority > heap[index].priority){
+                    swapNodes(heap[parent], heap[index]);
+                    int temp = parent;
+                    parent = index;
+                    index = temp;
                 }
                 // Done percolating up
                 else{
-                    heap.get(index).tag = -1L; // Available
-                    heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();  // Unlock the locks
-                    index = 0;
+                    heap[index].tag = -1L; Done = true;
                 }
             }
             // Tag of the parent is EMPTY (the current node is now at the root)
-            else if(heap.get(parent).tag == -2L){
-                heap.get(index).tag = -1L;  // Available
-                heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();  // Unlock the locks
-                index = 0;
+            else if(heap[parent].tag == -2L){
+                Done = true;
             }
             // Tag of the current node is NOT my process ID -> have to chase it up the heap
-            else if(heap.get(index).tag != Thread.currentThread().getId()){
-                heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();  // Unlock the locks
-                index = parent;
+            else if(heap[index].tag != Thread.currentThread().getId()){
+                int temp = parent;
+                parent = index;
+                index = temp;
             }
-            // None of the cases held, unlock the locks and try again
-            else{
-                heap.get(index).lock.unlock(); heap.get(parent).lock.unlock();
-            }
+            heap[index].unlock(); heap[parent].unlock();
         }
 
         // First insert
         if(index == 1){
-            heap.get(index).lock.lock();
-            if(heap.get(index).tag == Thread.currentThread().getId()) heap.get(index).tag = -1L;  // Available
-            heap.get(index).lock.unlock();
+            heap[index].lock();
+            if(heap[index].tag == Thread.currentThread().getId()) heap[index].tag = -1L;  // Available
+            heap[index].unlock();
         }
+
+        return true;
     }
 
     // Remove the highest priority node from the priority queue
-    public Integer remove(){
+    public Integer deleteMin(){
+        int child;
         // Get the data off the root node then delete it
         heapLock.lock();
-        int index = heap.size() - 1;
-
-        // Last node is the root
-        if(index == 1){
-            Integer value = heap.get(index).value;
-            heap.remove(index);
+        int index = (nextIndex - 1);
+        if(index == 0){
             heapLock.unlock();
-            return value;
+            return null; // Empty
+        }
+        nextIndex -= 1;
+        heap[index].lock(); heap[1].lock(); heapLock.unlock();
+        int priority = heap[index].priority;
+        heap[index].tag = -2L;
+
+        // Swap priorities
+        int temp = priority;
+        priority = heap[1].priority;
+        heap[1].priority = temp;
+        heap[index].unlock();
+
+        // Stop if its the only item in heap
+        if(heap[1].tag == -2L){
+            heap[1].unlock();
+            return priority;
         }
 
-        int returnValue = heap.get(1).value;    // Get the data off the root
-        heap.get(1).lock.lock();    // Lock the root note
-        swapNodes(heap.get(index), heap.get(1));    // Swap last node with the root
-        heap.remove(index); // Remove the last node
-        heapLock.unlock();
+        heap[1].tag = -1L;
 
         // Start percolating down
         index = 1;
-        while(index <= heap.size()/2){
-            int left=getLeft(index), right=getRight(index);
-            Node swapChild; // Will hold reference to child being swapped
-            int swapIndex;  // Index of the swapChild
-            boolean rightPresent = false;   // Is there a right child
+        while(index < heap.length/2) {
+            int left = index * 2, right = index * 2 + 1;
+            heap[left].lock();
+            heap[right].lock();
 
-            // Check children before locking
-            if(left < heap.size()) heap.get(left).lock.lock();
-            else break; // No left child - no possible swap
-            // Check children before locking
-            if(right < heap.size()){
-                heap.get(right).lock.lock();
-                rightPresent = true;
-            }
-
-            // See if the swapping child is left or right
-            if(rightPresent && heap.get(left).priority > heap.get(right).priority){
-                heap.get(left).lock.unlock();   // Don't need left anymore - unlock it
-                swapChild = heap.get(right);
-                swapIndex = right;
-            }
-            else{
-                if(rightPresent) heap.get(right).lock.unlock(); // Don't need right anymore - unlock it
-                swapChild = heap.get(left);
-                swapIndex = left;
-            }
-
-            // If child has a higher priority than parent, then swap
-            if(swapChild.priority < heap.get(index).priority){
-                swapNodes(swapChild, heap.get(index));
-                heap.get(index).lock.unlock();
-                index = swapIndex;
-            }
-            // Don't swap
-            else{
-                swapChild.lock.unlock();
+            // No left child - done
+            if(heap[left].tag == -2L){
+                heap[right].unlock(); heap[left].unlock();
                 break;
             }
+            // No right child or left has higher priority than right
+            else if((heap[right].tag == -2L) || (heap[left].priority < heap[right].priority)){
+                heap[right].unlock();
+                child = left;
+            }
+            // Right child has higher priority
+            else{
+                heap[left].unlock();
+                child = right;
+            }
 
+            // If child has higher priority, then swap
+            if(heap[child].priority < heap[index].priority){
+                swapNodes(heap[child], heap[index]);
+                heap[index].unlock();
+                index = child;
+            }else{
+                heap[child].unlock();
+                break;
+            }
         }
+        heap[index].unlock();
 
-        heap.get(index).lock.unlock();
-        return returnValue;
+        return priority;
     }
 
     // Helper methods to get indecies
@@ -147,7 +152,7 @@ public class FineGrainedPriorityQueue {
     private int getRight(int index){return (index*2) + 1;}
 
     // Method to add a node to the heap - The children should be allocated and set to empty
-    private void addNode(Node newNode){
+    /*private void addNode(Node newNode){
         // There is already a node allocated
         if(size.get() < heap.size()){
             // Copy over the data
@@ -164,7 +169,7 @@ public class FineGrainedPriorityQueue {
             int index = size.getAndIncrement();
             int left=getLeft(index), right=getRight(index);
         }
-    }
+    }*/
 
     // Swap the values of the two nodes
     private void swapNodes(Node one, Node two){
@@ -194,6 +199,31 @@ public class FineGrainedPriorityQueue {
             this.lock = new ReentrantLock();
         }
 
+        public Node(){
+            tag = -2L;
+            lock = new ReentrantLock();
+        }
+
+        public void lock(){
+            this.lock.lock();
+        }
+
+        public void unlock(){
+            this.lock.unlock();
+        }
+
+    }
+
+    public boolean verify(){
+        for(int i = 1; i < (nextIndex - 1)/2; i++){
+            int parent = i/2, left = 2*i, right = 2*i + 1;
+
+            if((heap[parent].priority > heap[i].priority) && parent>=1) return false;
+            if(heap[left].priority < heap[i].priority) return false;
+            if(heap[right].priority < heap[i].priority) return false;
+        }
+
+        return true;
     }
 
     public String toString(){
