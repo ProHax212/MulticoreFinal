@@ -8,7 +8,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class FineGrainedPriorityQueue {
 
     private Node[] heap;
-    private static int root = 1;
     private ReentrantLock heapLock;
     int nextIndex;
 
@@ -17,8 +16,7 @@ public class FineGrainedPriorityQueue {
         for(int i = 0; i < capacity+1; i++){
             heap[i] = new Node();
         }
-        nextIndex = root;
-
+        nextIndex = 1;
         heapLock = new ReentrantLock();
     }
 
@@ -27,14 +25,18 @@ public class FineGrainedPriorityQueue {
         // Temporarily lock the heap while adding
         heapLock.lock();
         int index = nextIndex;
+
+        // Not enough room
         if((index*2 + 1) >= heap.length){
             heapLock.unlock();
-            return false;  // Not enough room
+            return false;
         }
+
         nextIndex += 1;
-        heap[index].lock(); heapLock.unlock();
+        heap[index].lock();
         heap[index].priority = priority;
         heap[index].tag = Thread.currentThread().getId();
+        heapLock.unlock();
         heap[index].unlock();
 
         // Percolate up while priority is higher than parent
@@ -71,9 +73,9 @@ public class FineGrainedPriorityQueue {
 
         // First insert
         if(index == 1){
-            heap[index].lock();
-            if(heap[index].tag == Thread.currentThread().getId()) heap[index].tag = -1L;  // Available
-            heap[index].unlock();
+            heap[1].lock();
+            if(heap[1].tag == Thread.currentThread().getId()) heap[1].tag = -1L;  // Available
+            heap[1].unlock();
         }
 
         return true;
@@ -85,19 +87,20 @@ public class FineGrainedPriorityQueue {
         // Get the data off the root node then delete it
         heapLock.lock();
         int index = (nextIndex - 1);
+
+        // Heap is empty - return null
         if(index == 0){
             heapLock.unlock();
-            return null; // Empty
+            return null;
         }
+
         nextIndex -= 1;
-        heap[index].lock(); heap[1].lock(); heapLock.unlock();
-        int priority = heap[index].priority;
-        heap[index].tag = -2L;
+        heap[1].lock(); heap[index].lock(); heapLock.unlock();
+        int priority = heap[1].priority;
+        heap[1].tag = -2L;
 
         // Swap priorities
-        int temp = priority;
-        priority = heap[1].priority;
-        heap[1].priority = temp;
+        swapNodes(heap[1], heap[index]);
         heap[index].unlock();
 
         // Stop if its the only item in heap
@@ -132,7 +135,7 @@ public class FineGrainedPriorityQueue {
             }
 
             // If child has higher priority, then swap
-            if(heap[child].priority < heap[index].priority){
+            if((heap[child].priority < heap[index].priority) && (heap[child].tag != -2L)){
                 swapNodes(heap[child], heap[index]);
                 heap[index].unlock();
                 index = child;
@@ -150,26 +153,6 @@ public class FineGrainedPriorityQueue {
     private int getParent(int index){return index/2;}
     private int getLeft(int index){return index*2;}
     private int getRight(int index){return (index*2) + 1;}
-
-    // Method to add a node to the heap - The children should be allocated and set to empty
-    /*private void addNode(Node newNode){
-        // There is already a node allocated
-        if(size.get() < heap.size()){
-            // Copy over the data
-            int index = size.getAndIncrement();
-            int left=getLeft(index), right=getRight(index);
-            heap.set(index, newNode);
-
-            // You need to allocate nodes for the children
-            if(left >= heap.size()) heap.add(new Node(0, 0, 2L));
-            if(right >= heap.size()) heap.add(new Node(0, 0, 2L));
-        }
-        // There's not a node yet, make one
-        else{
-            int index = size.getAndIncrement();
-            int left=getLeft(index), right=getRight(index);
-        }
-    }*/
 
     // Swap the values of the two nodes
     private void swapNodes(Node one, Node two){
