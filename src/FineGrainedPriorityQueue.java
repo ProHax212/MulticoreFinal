@@ -4,16 +4,21 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A fine grained lock based priority queue
+ * The algorithm that was used was "An efficient algorithm for concurrent priority queue heaps"
+ * Authors: "Galen C. Hunt, Maged M. Michael, Srinivasan Parthasarathy, Michael L. Scott"
+ * Link - http://www.research.ibm.com/people/m/michael/ipl-1996.pdf
  */
 public class FineGrainedPriorityQueue {
+
+    private static final int MAX_LENGTH = 50;
 
     private Node[] heap;
     private ReentrantLock heapLock;
     int nextIndex;
 
-    public FineGrainedPriorityQueue(int capacity){
-        heap = new Node[capacity+1];
-        for(int i = 0; i < capacity+1; i++){
+    public FineGrainedPriorityQueue(){
+        heap = new Node[MAX_LENGTH+1];
+        for(int i = 0; i < MAX_LENGTH+1; i++){
             heap[i] = new Node();
         }
         nextIndex = 1;
@@ -33,25 +38,25 @@ public class FineGrainedPriorityQueue {
         }
 
         nextIndex += 1;
-        heap[index].lock();
+        heap[index].lock(); heapLock.unlock();
         heap[index].priority = priority;
         heap[index].tag = Thread.currentThread().getId();
-        heapLock.unlock();
         heap[index].unlock();
 
         // Percolate up while priority is higher than parent
         boolean Done = false;
         while(index > 1 && !Done){
-            int parent = index/2; heap[parent].lock(); heap[index].lock();
+            int parent = index/2;
+            int last = index;
+            heap[parent].lock();
+            heap[index].lock();
 
             // Parent is available and the current node is tagged by me
             if(heap[parent].tag == -1L && heap[index].tag == Thread.currentThread().getId()){
                 // Parent has lower priority - swap them
                 if(heap[parent].priority > heap[index].priority){
                     swapNodes(heap[parent], heap[index]);
-                    int temp = parent;
-                    parent = index;
-                    index = temp;
+                    index = parent;
                 }
                 // Done percolating up
                 else{
@@ -64,11 +69,10 @@ public class FineGrainedPriorityQueue {
             }
             // Tag of the current node is NOT my process ID -> have to chase it up the heap
             else if(heap[index].tag != Thread.currentThread().getId()){
-                int temp = parent;
-                parent = index;
-                index = temp;
+                index = parent;
             }
-            heap[index].unlock(); heap[parent].unlock();
+            heap[last].unlock();
+            heap[parent].unlock();
         }
 
         // First insert
@@ -197,6 +201,8 @@ public class FineGrainedPriorityQueue {
 
     }
 
+    // Verify the state of the Heap
+    // Every parent node should have a lower key than its children
     public boolean verify(){
         for(int i = 1; i < (nextIndex - 1)/2; i++){
             int parent = i/2, left = 2*i, right = 2*i + 1;
@@ -209,6 +215,8 @@ public class FineGrainedPriorityQueue {
         return true;
     }
 
+    // Tostring method for the heap
+    // Simply print the array
     public String toString(){
         String returnString = "";
         for(Node node : heap){

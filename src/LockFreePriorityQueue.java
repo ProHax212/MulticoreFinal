@@ -8,17 +8,19 @@ import java.util.concurrent.atomic.AtomicStampedReference;
 
 /**
  * A lock free priority queue
+ * The algorithm that was used was: "Fast and lock-free concurrent priority queues for multi-thread systems"
+ * Authors: "Hakan Sundell, Philippas Tsigas"
+ * Link - http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.67.1310&rep=rep1&type=pdf
  */
 public class LockFreePriorityQueue {
 
     static final int MAX_LEVEL = 25;    // Maximum height of the skiplist
-    //final AtomicMarkableReference<Node> head = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE), false);
-    //final AtomicMarkableReference<Node> tail = new AtomicMarkableReference<>(new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE), false);
 
+    // Sentinel Head and tail nodes (-Infinity : +Infinity)
     final Node head = new Node(MAX_LEVEL+1, Integer.MIN_VALUE, Integer.MIN_VALUE);
     final Node tail = new Node(MAX_LEVEL+1, Integer.MAX_VALUE, Integer.MAX_VALUE);
 
-    Random r = new Random();
+    Random r = new Random();    // Used for randomly assigning a level to a node
 
     public LockFreePriorityQueue(){
         for(int i = 0; i < head.next.length; i++){
@@ -26,6 +28,7 @@ public class LockFreePriorityQueue {
         }
     }
 
+    // Get a random level with a geometric distribution
     private int randomLevel(){
         int startingLevel = 0;
         while (startingLevel < MAX_LEVEL){
@@ -36,11 +39,14 @@ public class LockFreePriorityQueue {
         return startingLevel;
     }
 
+    // Return false if the node is marked for deletion, otherwise return the reference
     private Node readNode(AtomicMarkableReference<Node> node){
         if(node.isMarked()) return null;
         else return node.getReference();
     }
 
+    // Physically remove a node from the skiplist at the given level
+    //
     private void removeNode(Node node, Node prev, int level){
         Node last;
 
@@ -60,7 +66,6 @@ public class LockFreePriorityQueue {
                 node.next[level] = new AtomicMarkableReference<>(null, true);
                 break;
             }
-
 
             if(node.next[level].getReference() == null && node.next[level].isMarked()) break;
 

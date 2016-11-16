@@ -5,12 +5,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Main program for testing
+ * Main program for testing the fine grained and lock based priority queues
+ * numInserters - number of threads that will be adding to the priority queue
+ * numInsert - how many elements each thread will add
+ * numDeleters - number of threads that will be deleting from the priority queue
+ * numDelete - number of times each thread will try to delete
+ * There are 2 test methods, one for each implementation
+ * The end of each test method will print out the resulting structure that was used followed by a boolean variable saying if the state of the structure is correct
  */
 public class TestMain {
 
     public static void main(String[] args) {
-        int numInserters = 10; int numDeleters = 10;
+        int numInserters = 100; int numDeleters = 100;
         int numInsert = 1000; int numDelete = 1000;
 
         fineGrainedTest(numInserters, numInsert, numDeleters, numDelete);
@@ -18,7 +24,7 @@ public class TestMain {
     }
 
     private static void fineGrainedTest(int numInserters, int numInsert, int numDeleters, int numDelete){
-        FineGrainedPriorityQueue fineGrainedPriorityQueue = new FineGrainedPriorityQueue(1000);
+        FineGrainedPriorityQueue fineGrainedPriorityQueue = new FineGrainedPriorityQueue();
         Random r = new Random();
         ExecutorService inserters = Executors.newFixedThreadPool(numInserters);
         ExecutorService deleters = Executors.newFixedThreadPool(numDeleters);
